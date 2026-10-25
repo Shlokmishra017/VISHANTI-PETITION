@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from app.routers import auth
+from fastapi.exceptions import RequestValidationError
+from app.routers import auth, cases, track, stream, meta, public, dev
 from app.state_machine import InvalidTransitionError, PermissionDeniedError
 
 app = FastAPI(
@@ -26,11 +27,24 @@ async def permission_denied_handler(request: Request, exc: PermissionDeniedError
         content={"error": {"code": exc.code, "message": exc.message}}
     )
 
-# register sub-routers with /api prefix
+# normalize request validation errors to standard error payload
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=400,
+        content={"error": {"code": "VALIDATION_ERROR", "message": str(exc.errors())}}
+    )
+
+# register routers under /api prefix
 app.include_router(auth.router, prefix="/api")
+app.include_router(cases.router, prefix="/api")
+app.include_router(track.router, prefix="/api")
+app.include_router(stream.router, prefix="/api")
+app.include_router(meta.router, prefix="/api")
+app.include_router(public.router, prefix="/api")
+app.include_router(dev.router, prefix="/api")
 
 # health probe
 @app.get("/health")
 def health_check():
     return {"status": "ok", "system": "vishanti-ledger"}
-
